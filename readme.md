@@ -5,6 +5,37 @@
 
 A real-time voice AI that can hear, see, speak, and control your computer — on any OS. Supports Windows, macOS, and Linux. Built on the Gemini Live API for native audio streaming, delivering zero subscriptions and total digital autonomy.
 
+## ME4_Jarvis Qwen mode
+
+This fork is maintained as **ME4_Jarvis**, separate from the ME4_Codex
+workspace. It keeps the full Mark-LVII conversation, task, memory, action and
+text-input surface while allowing the voice path to use the protected Qwen
+stack:
+
+`Mic → VAD → Qwen ASR → Qwen 3.6 vLLM → Qwen TTS`
+
+The Qwen text, ASR and TTS credentials are loaded at launch from process
+environment variables. They are never written to the repository, provider
+configuration, UI, handoff, or test output. Local Whisper and system/Piper
+speech remain available as fallback providers for Raspberry Pi operation.
+
+From the repository root, the protected Windows launcher is:
+
+```powershell
+.\scripts\Start-Mark-LVII-Qwen.ps1
+```
+
+The offline acceptance suite and the optional live Qwen/GitHub read-only checks
+are run with:
+
+```powershell
+..\.venv\Scripts\python.exe scripts\test_agent.py
+```
+
+See [`docs/RASPBERRY_PI_COMPATIBILITY.md`](docs/RASPBERRY_PI_COMPATIBILITY.md)
+for the current ARM64/Pi boundary and the hardware checks that remain before a
+deployment.
+
 ---
 
 ## ✨ Overview

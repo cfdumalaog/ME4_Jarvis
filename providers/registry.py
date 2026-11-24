@@ -34,8 +34,8 @@ from .base import Field, caps_of, validate
 # skipped, never raised.
 _MODULES: dict[str, tuple[str, ...]] = {
     "llm": ("llm_openai",),
-    "stt": ("stt_whisper",),
-    "tts": ("tts_piper", "tts_system", "tts_elevenlabs"),
+    "stt": ("stt_whisper", "stt_qwen"),
+    "tts": ("tts_piper", "tts_system", "tts_elevenlabs", "tts_qwen"),
     "engine": ("engine_pipeline",),
 }
 

@@ -30,6 +30,7 @@ WHAT IS DELIBERATELY NOT HERE
 from __future__ import annotations
 
 import json
+import os
 import time
 import contextlib
 from importlib.util import find_spec
@@ -128,6 +129,10 @@ CATALOG = (
     {"id": "vllm",       "label": "vLLM",
      "note": "on this computer · free", "local": True,
      "values": {"base_url": PRESETS["vLLM"], **_LOCAL}},
+    {"id": "qwen",       "label": "Qwen 3.6 vLLM",
+     "note": "protected Qwen endpoint · key loaded at runtime", "local": None,
+     "values": {"base_url": "http://202.92.159.240:8000/v1",
+                **_LOCAL, "model": "Qwen/Qwen3.6-27B"}},
     {"id": "jan",        "label": "Jan",
      "note": "on this computer · free", "local": True,
      "values": {"base_url": PRESETS["Jan"], **_LOCAL}},
@@ -360,6 +365,19 @@ class OpenAICompatLLM:
         self.base = _normalise(cfg.get("base_url") or "")
         self.model = (cfg.get("model") or "").strip()
         self.key = (cfg.get("api_key") or "").strip()
+        # Protected launchers can provide a credential without writing it to
+        # api_keys.json, the repository, or the UI. A named environment field
+        # wins; the Qwen/vLLM aliases keep the default setup one-click.
+        if not self.key:
+            env_name = str(cfg.get("api_key_env") or "").strip()
+            if env_name:
+                self.key = (os.getenv(env_name) or "").strip()
+        if not self.key and (
+            "qwen" in self.model.lower()
+            or "202.92.159.240" in self.base
+        ):
+            self.key = (os.getenv("QWEN_TEXT_API_KEY")
+                        or os.getenv("VLLM_API_KEY") or "").strip()
         if not self.key and "generativelanguage.googleapis.com" in self.base:
             # The Gemini entry needs no second key: the one Gemini Live already
             # uses is the natural choice, and a different key pasted here is how
