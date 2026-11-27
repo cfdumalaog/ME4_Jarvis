@@ -37,6 +37,20 @@ def _qwen_key(secret_file: Path) -> str:
     return ""
 
 
+def _qwen_audio_key(secret_file: Path) -> str:
+    value = (os.getenv("QWEN_AUDIO_API_KEY", "").strip() or
+             os.getenv("QWEN_INSTRUCT_API_KEY", "").strip())
+    if value:
+        return value
+    if not secret_file.is_file():
+        return ""
+    for line in secret_file.read_text(encoding="utf-8").splitlines():
+        match = re.search(r"(?i)API\s+Key\s+for\s+both\s+models\s+is\s+(.+?)\s*$", line)
+        if match and match.group(1).strip():
+            return match.group(1).strip().strip('`"\'')
+    return ""
+
+
 def _run(label: str, args: list[str], *, cwd: Path = ROOT,
          env: dict[str, str] | None = None) -> None:
     print(f"\n[{label}]")
@@ -128,6 +142,73 @@ def _live(secret_file: Path) -> None:
     print("  PASS  response body withheld from logs")
 
 
+def _live_audio(secret_file: Path) -> None:
+    key = _qwen_audio_key(secret_file)
+    if not key:
+        raise SystemExit("Live Qwen audio check requested but no protected audio key was found.")
+    import base64  # noqa: PLC0415
+    import httpx  # noqa: PLC0415
+
+    asr_base = os.getenv("QWEN_ASR_BASE_URL", "http://10.153.60.233:8000/v1").rstrip("/")
+    asr_model = os.getenv("QWEN_ASR_MODEL", "Qwen/Qwen2-Audio-7B-Instruct")
+    tts_base = os.getenv("QWEN_TTS_BASE_URL", "http://10.153.60.233:8001/v1").rstrip("/")
+    tts_model = os.getenv("QWEN_TTS_MODEL", "Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice")
+    voice = os.getenv("QWEN_TTS_VOICE", "aiden")
+    headers = {"Authorization": f"Bearer {key}"}
+    started = time.monotonic()
+    with httpx.Client(timeout=60.0, trust_env=False) as client:
+        asr_models = client.get(f"{asr_base}/models", headers=headers)
+        asr_models.raise_for_status()
+        asr_ids = {str(item.get("id")) for item in asr_models.json().get("data", [])}
+        assert asr_model in asr_ids, f"configured ASR model not listed: {asr_model}"
+
+        tts_models = client.get(f"{tts_base}/models", headers=headers)
+        tts_models.raise_for_status()
+        tts_ids = {str(item.get("id")) for item in tts_models.json().get("data", [])}
+        assert tts_model in tts_ids, f"configured TTS model not listed: {tts_model}"
+
+        speech = client.post(
+            f"{tts_base}/audio/speech",
+            headers={**headers, "Content-Type": "application/json"},
+            json={"model": tts_model, "input": "Jarvis audio pipeline test.",
+                  "voice": voice, "response_format": "wav"},
+        )
+        speech.raise_for_status()
+        wav = speech.content
+        assert wav, "Qwen TTS returned no audio bytes"
+
+        audio_url = "data:audio/wav;base64," + base64.b64encode(wav).decode("ascii")
+        transcript = client.post(
+            f"{asr_base}/chat/completions",
+            headers={**headers, "Content-Type": "application/json"},
+            json={
+                "model": asr_model,
+                "messages": [{"role": "user", "content": [
+                    {"type": "audio_url", "audio_url": {"url": audio_url}},
+                    {"type": "text", "text": (
+                        "Transcribe the spoken audio exactly. Return only the transcript."
+                    )},
+                ]}],
+                "max_tokens": 256,
+                "temperature": 0,
+            },
+        )
+        transcript.raise_for_status()
+        payload = transcript.json()
+        choices = payload.get("choices") or []
+        assert choices, "Qwen ASR response had no choices"
+        message = choices[0].get("message") or {}
+        content = message.get("content") or ""
+        if isinstance(content, list):
+            content = " ".join(str(item.get("text") or "") for item in content
+                                if isinstance(item, dict))
+        assert isinstance(content, str) and content.strip(), "Qwen ASR returned empty text"
+    print("\n[Live Qwen audio pipeline]")
+    print(f"  PASS  authenticated ASR/TTS model discovery and TTS audio ({len(wav)} bytes)")
+    print(f"  PASS  Qwen2-Audio multimodal chat transcription ({time.monotonic() - started:.2f}s)")
+    print("  PASS  transcript body and credential values withheld from logs")
+
+
 def _github_read_only(secret_file: Path) -> None:
     token = ""
     if secret_file.is_file():
@@ -164,6 +245,7 @@ def main() -> int:
     _offline()
     if not args.skip_live:
         _live(args.secret_file)
+        _live_audio(args.secret_file)
     if not args.skip_github:
         _github_read_only(args.secret_file)
     print("\nMARK-LVII AGENT ACCEPTANCE: PASS")

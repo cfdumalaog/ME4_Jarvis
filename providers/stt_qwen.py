@@ -1,7 +1,13 @@
-"""Qwen-compatible speech recognition over ``/v1/audio/transcriptions``."""
+"""Qwen2-Audio speech recognition over an OpenAI-compatible vLLM endpoint.
+
+The deployed Qwen2-Audio server accepts multimodal audio messages through
+``/v1/chat/completions``. A legacy transcription route is retained as an
+explicit opt-in for servers that implement it, but is not the default.
+"""
 from __future__ import annotations
 
 import asyncio
+import base64
 import os
 from importlib.util import find_spec
 
@@ -14,6 +20,15 @@ class QwenSTT:
     def __init__(self, cfg: dict):
         self.base_url = _normalise(cfg.get("base_url") or "")
         self.model = str(cfg.get("model") or "Qwen/Qwen2-Audio-7B-Instruct").strip()
+        self.protocol = str(cfg.get("protocol") or "chat_completions").strip().lower()
+        self.prompt = str(
+            cfg.get("prompt") or
+            "Transcribe the spoken audio exactly. Return only the transcript."
+        ).strip()
+        try:
+            self.max_tokens = max(1, int(cfg.get("max_tokens") or 256))
+        except (TypeError, ValueError):
+            self.max_tokens = 256
         self.api_key = str(cfg.get("api_key") or "").strip()
         if not self.api_key:
             env_name = str(cfg.get("api_key_env") or "QWEN_AUDIO_API_KEY").strip()
@@ -29,20 +44,56 @@ class QwenSTT:
             raise RuntimeError("Qwen ASR has no base URL")
         wav = audio.to_wav(pcm, sample_rate)
         headers = {"Authorization": f"Bearer {self.api_key}"} if self.api_key else {}
-        data = {"model": self.model, "response_format": "json"}
-        if self.language:
-            data["language"] = self.language
         with httpx.Client(timeout=60.0, trust_env=not _is_loopback(self.base_url)) as cl:
-            response = cl.post(
-                f"{self.base_url}/audio/transcriptions",
-                headers=headers,
-                data=data,
-                files={"file": ("speech.wav", wav, "audio/wav")},
-            )
+            if self.protocol in {"transcriptions", "audio_transcriptions"}:
+                data = {"model": self.model, "response_format": "json"}
+                if self.language:
+                    data["language"] = self.language
+                response = cl.post(
+                    f"{self.base_url}/audio/transcriptions",
+                    headers=headers,
+                    data=data,
+                    files={"file": ("speech.wav", wav, "audio/wav")},
+                )
+            else:
+                prompt = self.prompt
+                if self.language:
+                    prompt += f" The spoken language is {self.language}."
+                audio_url = (
+                    "data:audio/wav;base64," +
+                    base64.b64encode(wav).decode("ascii")
+                )
+                response = cl.post(
+                    f"{self.base_url}/chat/completions",
+                    headers={**headers, "Content-Type": "application/json"},
+                    json={
+                        "model": self.model,
+                        "messages": [{
+                            "role": "user",
+                            "content": [
+                                {"type": "audio_url", "audio_url": {"url": audio_url}},
+                                {"type": "text", "text": prompt},
+                            ],
+                        }],
+                        "max_tokens": self.max_tokens,
+                        "temperature": 0,
+                    },
+                )
             if response.status_code >= 400:
                 raise RuntimeError(f"{response.status_code} {_terse(response.text)}")
             payload = response.json()
         text = payload.get("text") or payload.get("transcript") or ""
+        if not text:
+            choices = payload.get("choices") or []
+            message = choices[0].get("message") if choices else {}
+            content = (message or {}).get("content") or ""
+            if isinstance(content, list):
+                content = " ".join(
+                    str(item.get("text") or "")
+                    for item in content
+                    if isinstance(item, dict)
+                )
+            text = content
         if not isinstance(text, str):
             raise RuntimeError("Qwen ASR response did not contain text")
         return text.strip()
@@ -79,12 +130,16 @@ PROVIDER = {
          "note": "remote endpoint · protected key at runtime", "local": None,
          "values": {"base_url": "http://10.153.60.233:8000/v1",
                     "model": "Qwen/Qwen2-Audio-7B-Instruct",
+                    "protocol": "chat_completions",
                     "api_key_env": "QWEN_AUDIO_API_KEY"}},
     ),
     "needs": (
         Field("base_url", "Address", kind="choice",
               default="http://10.153.60.233:8000/v1"),
         Field("model", "Model", default="Qwen/Qwen2-Audio-7B-Instruct"),
+        Field("protocol", "Protocol", default="chat_completions", required=False,
+              advanced=True,
+              hint="Default: multimodal /chat/completions; legacy transcription route is opt-in"),
         Field("api_key", "API key", kind="secret", required=False,
               hint="Loaded from QWEN_AUDIO_API_KEY when left empty"),
         Field("api_key_env", "Key environment variable", default="QWEN_AUDIO_API_KEY",

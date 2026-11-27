@@ -38,12 +38,26 @@ $env:VLLM_API_KEY = $qwenKey
 $env:QWEN_TEXT_BASE_URL = $QwenBaseUrl
 $env:QWEN_TEXT_MODEL = $QwenModel
 
-# Audio credentials are intentionally environment-only as well. The text key
-# is not silently reused: ASR/TTS may be served by a separate protected vLLM
-# instance. If the caller has already seeded the audio key, both provider
-# adapters receive the same process-scoped value.
+# Audio credentials are intentionally process-only as well. The text key is
+# not silently reused: ASR/TTS are served by a separate protected vLLM
+# instance. The launcher accepts an environment seed or the sentence-form
+# audio key in the protected handoff file; both adapters receive the same
+# process-scoped value.
 $audioKey = $env:QWEN_AUDIO_API_KEY
 if ([string]::IsNullOrWhiteSpace($audioKey)) { $audioKey = $env:QWEN_INSTRUCT_API_KEY }
+if ([string]::IsNullOrWhiteSpace($audioKey) -and (Test-Path -LiteralPath $SecretFile -PathType Leaf)) {
+    foreach ($line in [IO.File]::ReadAllLines($SecretFile)) {
+        # The supplied handoff uses a sentence rather than KEY=value:
+        # "The API Key for both models is ...". Keep the value process-only.
+        if ($line -match '(?i)API\s+Key\s+for\s+both\s+models\s+is\s+(.+?)\s*$') {
+            $candidate = $Matches[1].Trim().Trim('`"''')
+            if (-not [string]::IsNullOrWhiteSpace($candidate)) {
+                $audioKey = $candidate
+                break
+            }
+        }
+    }
+}
 if (-not [string]::IsNullOrWhiteSpace($audioKey)) {
     $env:QWEN_AUDIO_API_KEY = $audioKey
     $env:QWEN_INSTRUCT_API_KEY = $audioKey

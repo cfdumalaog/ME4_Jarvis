@@ -42,6 +42,8 @@ def main() -> None:
             "catalog": "qwen",
             "base_url": os.getenv("QWEN_ASR_BASE_URL", "http://10.153.60.233:8000/v1"),
             "model": os.getenv("QWEN_ASR_MODEL", "Qwen/Qwen2-Audio-7B-Instruct"),
+            "protocol": os.getenv("QWEN_ASR_PROTOCOL", "chat_completions"),
+            "prompt": "Transcribe the spoken audio exactly. Return only the transcript.",
             "api_key_env": "QWEN_AUDIO_API_KEY",
         },
         tts_id: {
