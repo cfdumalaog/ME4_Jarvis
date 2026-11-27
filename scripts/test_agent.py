@@ -64,15 +64,15 @@ def _offline() -> None:
         cfg = {
             "catalog": "qwen",
             "base_url": "http://202.92.159.240:8000/v1",
-            "model": "Qwen/Qwen3.6-27B",
+            "model": "Qwen/Qwen3.8-27B",
             "api_key_env": "QWEN_TEXT_API_KEY",
         }
         llm = OpenAICompatLLM(cfg)
         assert llm.base.endswith("/v1")
-        assert llm.model == "Qwen/Qwen3.6-27B"
+        assert llm.model == "Qwen/Qwen3.8-27B"
         assert bool(llm.key), "protected environment fallback was not loaded"
         entry = registry.catalog_entry("openai_compat@qwen")
-        assert entry.get("values", {}).get("model") == "Qwen/Qwen3.6-27B"
+        assert entry.get("values", {}).get("model") == "Qwen/Qwen3.8-27B"
         stt_decl = registry.get_declaration("qwen_audio")
         tts_decl = registry.get_declaration("qwen_tts")
         assert stt_decl and tts_decl
@@ -100,7 +100,7 @@ def _live(secret_file: Path) -> None:
     import httpx  # noqa: PLC0415
 
     base = os.getenv("QWEN_TEXT_BASE_URL", "http://202.92.159.240:8000/v1").rstrip("/")
-    model = os.getenv("QWEN_TEXT_MODEL", "Qwen/Qwen3.6-27B")
+    model = os.getenv("QWEN_TEXT_MODEL", "Qwen/Qwen3.8-27B")
     headers = {"Authorization": f"Bearer {key}"}
     started = time.monotonic()
     with httpx.Client(timeout=30.0, trust_env=False) as client:

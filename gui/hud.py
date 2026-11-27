@@ -42,6 +42,11 @@ from gui.theme import (
 from gui.style import blend, chamfer, px_font, with_alpha
 
 try:
+    from gui.dynamic_voice import DynamicVoiceOrb
+except Exception:      # pragma: no cover — classic HUD remains available
+    DynamicVoiceOrb = None
+
+try:
     from gui.reactor import Reactor3D
 except Exception:      # pragma: no cover — the classic core still draws
     Reactor3D = None
@@ -77,6 +82,13 @@ class HudCanvas(QWidget):
                 self._reactor = Reactor3D()
             except Exception:
                 self._reactor = None
+
+        self._dynamic_voice = None
+        if DynamicVoiceOrb is not None:
+            try:
+                self._dynamic_voice = DynamicVoiceOrb()
+            except Exception:
+                self._dynamic_voice = None
 
         # Which centrepiece to draw. Read once here and changed live by the
         # settings toggle; the avatar object is kept either way so switching
@@ -342,6 +354,12 @@ class HudCanvas(QWidget):
                               v_open=v_open, v_wide=v_wide or 0.0,
                               v_level=v_level, v_seq=v_seq,
                               v_hop=(sched[2] if sched is not None else 0.02))
+        elif self.hud_style == "dynamic" and self._dynamic_voice is not None:
+            self._dynamic_voice.step(
+                dt, amp, speaking=self.speaking,
+                thinking=self.state in ("THINKING", "PROCESSING"),
+                muted=self.muted,
+            )
         else:
             if self._reactor is not None:
                 self._reactor.step(dt, self.speaking,
@@ -626,6 +644,29 @@ class HudCanvas(QWidget):
                 else:
                     acc = qcol(C.PRI)
             self._avatar.paint(p, cx, head_cy, r_head, main, acc, qcol(C.BG))
+        elif self.hud_style == "dynamic" and self._dynamic_voice is not None:
+            r = min(W * 0.34, band_h / 2.20)
+            core_cy = band_t + band_h / 2.0
+            if self.muted:
+                main = acc = qcol(C.MUTED_C)
+            else:
+                main = qcol(C.PRI)
+                if self.speaking:
+                    acc = qcol(C.ACC)
+                elif self.state in ("THINKING", "PROCESSING"):
+                    acc = qcol(C.ACC2)
+                elif self.state == "LISTENING":
+                    acc = qcol(C.GREEN)
+                else:
+                    acc = qcol(C.PRI)
+            self._dynamic_voice.paint(
+                p, cx, core_cy, r, main, acc, qcol(C.WHITE), self._amp_disp,
+                speaking=self.speaking,
+                thinking=self.state in ("THINKING", "PROCESSING"),
+                muted=self.muted,
+                state=self.state,
+                name=self._assistant_name or "",
+            )
         elif self._reactor is not None:
             ext = Reactor3D.TOP + Reactor3D.BOTTOM
             r = min(W * 0.25, band_h / ext)

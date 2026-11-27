@@ -20,7 +20,7 @@ from memory.config_manager import save_providers  # noqa: E402
 
 def main() -> None:
     base_url = os.getenv("QWEN_TEXT_BASE_URL", "http://202.92.159.240:8000/v1")
-    model = os.getenv("QWEN_TEXT_MODEL", "Qwen/Qwen3.6-27B")
+    model = os.getenv("QWEN_TEXT_MODEL", "Qwen/Qwen3.8-27B")
     qwen_id = "openai_compat@qwen"
     stt_id = "qwen_audio@qwen"
     tts_id = "qwen_tts@qwen"

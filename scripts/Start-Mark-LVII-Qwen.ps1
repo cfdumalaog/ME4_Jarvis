@@ -1,7 +1,7 @@
 param(
     [string]$SecretFile = '',
     [string]$QwenBaseUrl = 'http://202.92.159.240:8000/v1',
-    [string]$QwenModel = 'Qwen/Qwen3.6-27B',
+    [string]$QwenModel = 'Qwen/Qwen3.8-27B',
     [switch]$SkipConfigure
 )
 

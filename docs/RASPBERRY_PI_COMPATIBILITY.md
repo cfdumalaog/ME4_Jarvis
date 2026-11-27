@@ -13,7 +13,7 @@ The voice pipeline itself does not require a GPU:
 
 ```text
 USB microphone -> Mark-LVII audio capture/VAD -> Qwen2-Audio ASR
-               -> Qwen/Qwen3.6-27B vLLM -> Qwen3-TTS CustomVoice
+               -> Qwen/Qwen3.8-27B vLLM -> Qwen3-TTS CustomVoice
                -> USB speaker
 ```
 

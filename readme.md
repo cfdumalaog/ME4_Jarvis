@@ -19,6 +19,10 @@ environment variables. They are never written to the repository, provider
 configuration, UI, handoff, or test output. Local Whisper and system/Piper
 speech remain available as fallback providers for Raspberry Pi operation.
 
+The current text endpoint advertises the model alias `Qwen/Qwen3.8-27B`; the
+launcher uses that server-provided alias while retaining the Qwen vLLM
+architecture requested for this agent.
+
 From the repository root, the protected Windows launcher is:
 
 ```powershell

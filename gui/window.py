@@ -2500,24 +2500,30 @@ class MainWindow(QMainWindow):
 
     def _refresh_hud_btn(self):
         from memory.config_manager import get_hud_style
-        face = get_hud_style() == "face"
+        style = get_hud_style()
         # Neither state is "off", so both read as active — this is a choice
-        # between two things, not a switch with a disabled side.
-        self._hud_btn.setText("🧑  HUD: ANIMATED FACE" if face
-                              else "◉  HUD: REACTOR CORE")
+        # between three centrepieces, not a switch with a disabled side.
+        labels = {
+            "dynamic": "◉  HUD: DYNAMIC VOICE",
+            "core": "◉  HUD: REACTOR CORE",
+            "face": "🧑  HUD: ANIMATED FACE",
+        }
+        self._hud_btn.setText(labels.get(style, labels["dynamic"]))
         self._hud_btn.setStyleSheet(btn_css("choice"))
-        self._hud_btn.setToolTip(
-            "An animated head that speaks your words and shows what JARVIS is "
-            "doing. Tap to switch to the reactor core."
-            if face else
-            "A 3-D reactor core that turns with the state and moves with your "
-            "voice. Tap to switch to the animated head.")
+        tips = {
+            "dynamic": "ME4-Initial-style voice orb with live level spikes and state colour. Tap to switch to the reactor core.",
+            "core": "A 3-D reactor core that turns with the state and moves with your voice. Tap to switch to the animated face.",
+            "face": "The original animated head. Tap to switch to the dynamic voice orb.",
+        }
+        self._hud_btn.setToolTip(tips.get(style, tips["dynamic"]))
 
     def _toggle_hud_style(self):
         """Swap the centrepiece. Both objects stay in memory, so the change is
         instant and switching back costs nothing."""
         from memory.config_manager import get_hud_style, save_hud_style
-        want = "core" if get_hud_style() == "face" else "face"
+        cycle = ("dynamic", "core", "face")
+        current = get_hud_style()
+        want = cycle[(cycle.index(current) + 1) % len(cycle)] if current in cycle else "dynamic"
         save_hud_style(want)
         try:
             self.hud.hud_style = want
@@ -2525,9 +2531,11 @@ class MainWindow(QMainWindow):
         except Exception:
             pass
         self._refresh_hud_btn()
-        self._log.append_log(
-            "SYS: HUD switched to the animated face." if want == "face"
-            else "SYS: HUD switched to the reactor core.")
+        self._log.append_log({
+            "dynamic": "SYS: HUD switched to the dynamic voice orb.",
+            "core": "SYS: HUD switched to the reactor core.",
+            "face": "SYS: HUD switched to the animated face.",
+        }[want])
 
     def _toggle_ptt(self):
         from memory.config_manager import (get_push_to_talk_enabled,

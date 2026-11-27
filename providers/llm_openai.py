@@ -132,7 +132,7 @@ CATALOG = (
     {"id": "qwen",       "label": "Qwen 3.6 vLLM",
      "note": "protected Qwen endpoint · key loaded at runtime", "local": None,
      "values": {"base_url": "http://202.92.159.240:8000/v1",
-                **_LOCAL, "model": "Qwen/Qwen3.6-27B"}},
+                **_LOCAL, "model": "Qwen/Qwen3.8-27B"}},
     {"id": "jan",        "label": "Jan",
      "note": "on this computer · free", "local": True,
      "values": {"base_url": PRESETS["Jan"], **_LOCAL}},
